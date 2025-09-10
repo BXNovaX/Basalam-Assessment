@@ -9,7 +9,7 @@ load_dotenv()
 
 K8S_API_SERVER = os.getenv('K8S_API_SERVER')
 K8S_TOKEN = os.getenv('K8S_TOKEN')
-NIXYS_CHART_PATH = os.getenv('NIXYS_CHART_PATH', "https://github.com/nixys/nxs-universal-chart")
+NIXYS_CHART_PATH = os.getenv('NIXYS_CHART_PATH', "nixys/nxs-universal-chart")
 
 
 if not K8S_API_SERVER or not K8S_TOKEN:
