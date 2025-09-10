@@ -9,7 +9,8 @@ export default function DeploymentDetail() {
   const { id } = useParams();
   const { data: deployment, error, isLoading } = useSWR(
     `http://localhost:8000/app/deployments/${id}/`,
-    fetcher
+    fetcher,
+    { refreshInterval: 2000 }
   );
 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-background text-muted-foreground">Loading deployment...</div>;
@@ -60,6 +61,20 @@ export default function DeploymentDetail() {
               </pre>
             ) : (
               <div className="text-sm text-muted-foreground">No logs available.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Error Messages */}
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-sm font-medium mb-6">Error Messages</h2>
+            {deployment?.error_messages ? (
+              <pre className="text-sm bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap text-red-600">
+                {deployment.error_messages}
+              </pre>
+            ) : (
+              <div className="text-sm text-muted-foreground">No error messages.</div>
             )}
           </CardContent>
         </Card>

@@ -1,4 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+
 import useSWR from 'swr';
 import { Card, CardContent } from '@/components/ui/card';
 import EditAppModal from '@/components/EditAppModal';
@@ -9,6 +10,7 @@ import { useState } from 'react';
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function AppDetail() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const { data: app, error, isLoading, mutate } = useSWR(
     `http://localhost:8000/app/${id}/`,
@@ -19,10 +21,17 @@ export default function AppDetail() {
   const handleDeploy = async () => {
     setDeploying(true);
     try {
-      await fetch(`http://localhost:8000/app/${id}/deploy/`, {
+      const response = await fetch(`http://localhost:8000/app/${id}/deploy/`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
+
+      const deployment = await response.json();
+
+      if (deployment?.id) {
+        navigate(`/deployments/${deployment.id}`);
+      }
+
       mutate();
     } catch (err) {
       console.error('Deployment failed', err);
