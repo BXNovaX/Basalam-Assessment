@@ -9,7 +9,8 @@ export default function DeploymentDetail() {
   const { id } = useParams();
   const { data: deployment, error, isLoading } = useSWR(
     `http://localhost:8000/app/deployments/${id}/`,
-    fetcher
+    fetcher,
+    { refreshInterval: 2000 }
   );
 
   if (isLoading) return <div className="flex items-center justify-center min-h-screen bg-background text-muted-foreground">Loading deployment...</div>;

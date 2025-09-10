@@ -3,7 +3,7 @@ import useSWR from 'swr';
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function AppStatus({ appId }) {
-  const { data, error } = useSWR(`http://localhost:8000/app/${appId}/status/`, fetcher);
+  const { data, error } = useSWR(`http://localhost:8000/app/${appId}/status/`, fetcher, { refreshInterval: 2000 });
 
   if (error) return <span className="text-red-600 text-xs">Error</span>;
   if (!data) return <span className="text-muted-foreground text-xs">Loading...</span>;

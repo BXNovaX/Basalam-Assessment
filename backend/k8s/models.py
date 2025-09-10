@@ -25,8 +25,8 @@ class Deployment(models.Model):
     app = models.ForeignKey(App, related_name='deployments', on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in-progress')
-    helm_values = models.JSONField(default=dict)
-    logs = models.TextField()
+    helm_values = models.JSONField(default=dict, blank=True, null=True)
+    logs = models.TextField(blank=True, null=True)
     error_messages = models.TextField(blank=True, null=True)
 
     def __str__(self):

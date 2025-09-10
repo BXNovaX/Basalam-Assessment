@@ -2,6 +2,7 @@ import subprocess
 import yaml
 import time
 import tempfile
+import threading
 
 from django.conf import settings
 from kubernetes import client
@@ -37,41 +38,49 @@ def deploy_app(app):
     deployment = Deployment.objects.create(
         app=app,
         status='in-progress',
-        helm_values=values_yaml
+        helm_values=values_yaml,
+        logs='',
+        error_messages=''
     )
 
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".yaml", delete=False) as f:
-        f.write(values_yaml)
-        yaml_file_path = f.name
+    def run_helm(deployment_id):
+        deployment_obj = Deployment.objects.get(id=deployment_id)
 
-    cmd = f"helm upgrade --install {app.name} {settings.NIXYS_CHART_PATH} --namespace {app.namespace} -f {yaml_file_path}"
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".yaml", delete=False) as f:
+            f.write(values_yaml)
+            yaml_file_path = f.name
 
-    try:
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
-        deployment.logs = result.stdout
+        cmd = f"helm upgrade --install {app.name} {settings.NIXYS_CHART_PATH} --namespace {app.namespace} -f {yaml_file_path}"
 
-        v1 = get_k8s_client()
-        for _ in range(10):
-            pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app={app.name}")
-            if pods.items:
-                if any(p.status.phase == "Running" for p in pods.items):
-                    deployment.status = 'success'
-                    deployment.error_messages = ""
-                else:
-                    deployment.status = 'failed'
-                    deployment.error_messages = "\n".join(
-                        f"{p.metadata.name}: {p.status.phase}" for p in pods.items
-                    )
-                break
-            time.sleep(1)
-        else:
-            deployment.status = 'failed'
-            deployment.error_messages = "No pods were created after deployment attempt."
+        try:
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            deployment_obj.logs = result.stdout
 
-    except subprocess.CalledProcessError as e:
-        deployment.status = 'failed'
-        deployment.logs = e.stdout
-        deployment.error_messages = e.stderr or "Helm command failed"
+            v1 = get_k8s_client()
+            for _ in range(10):
+                pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app={app.name}")
+                if pods.items:
+                    if any(p.status.phase == "Running" for p in pods.items):
+                        deployment_obj.status = 'success'
+                        deployment_obj.error_messages = ""
+                    else:
+                        deployment_obj.status = 'failed'
+                        deployment_obj.error_messages = "\n".join(
+                            f"{p.metadata.name}: {p.status.phase}" for p in pods.items
+                        )
+                    break
+                time.sleep(1)
+            else:
+                deployment_obj.status = 'failed'
+                deployment_obj.error_messages = "No pods were created after deployment attempt."
 
-    deployment.save()
+        except subprocess.CalledProcessError as e:
+            deployment_obj.status = 'failed'
+            deployment_obj.logs = e.stdout
+            deployment_obj.error_messages = e.stderr or "Helm command failed"
+
+        deployment_obj.save()
+
+    threading.Thread(target=run_helm, args=(deployment.id,), daemon=True).start()
+
     return deployment
