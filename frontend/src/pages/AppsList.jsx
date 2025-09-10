@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import useSWR from 'swr';
 import { Card, CardContent } from '@/components/ui/card';
 import AddAppModal from '@/components/AddAppModal';
+import AppStatus from '@/components/AppStatus';
 
 const fetcher = (url) => fetch(url).then((res) => res.json());
 
@@ -77,6 +78,8 @@ export default function AppsList() {
                           <span className="text-xs text-muted-foreground">
                             {app.replicas} {app.replicas === 1 ? 'replica' : 'replicas'}
                           </span>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <AppStatus appId={app.id} />
                         </div>
                       </div>
                     </div>
