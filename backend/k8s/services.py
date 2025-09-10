@@ -1,5 +1,6 @@
 import subprocess
 import yaml
+import time
 
 from django.conf import settings
 from kubernetes import client
@@ -47,7 +48,19 @@ def deploy_app(app):
 
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
-        deployment.status = 'success'
+
+        v1 = get_k8s_client()
+        for _ in range(10):  # try for ~10s
+            pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app={app.name}")
+            if pods.items:
+                if any(p.status.phase == "Running" for p in pods.items):
+                    deployment.status = 'success'
+                else:
+                    deployment.status = 'failed'
+                break
+            time.sleep(1)
+        else:
+            deployment.status = 'failed'
         deployment.logs = result.stdout
     except subprocess.CalledProcessError as e:
         deployment.status = 'failed'
