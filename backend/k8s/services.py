@@ -1,6 +1,7 @@
 import subprocess
 import yaml
 import time
+import tempfile
 
 from django.conf import settings
 from kubernetes import client
@@ -39,7 +40,6 @@ def deploy_app(app):
         helm_values=values_yaml
     )
 
-    import tempfile
     with tempfile.NamedTemporaryFile(mode="w+", suffix=".yaml", delete=False) as f:
         f.write(values_yaml)
         yaml_file_path = f.name
@@ -48,23 +48,30 @@ def deploy_app(app):
 
     try:
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+        deployment.logs = result.stdout
 
         v1 = get_k8s_client()
-        for _ in range(10):  # try for ~10s
+        for _ in range(10):
             pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app={app.name}")
             if pods.items:
                 if any(p.status.phase == "Running" for p in pods.items):
                     deployment.status = 'success'
+                    deployment.error_messages = ""
                 else:
                     deployment.status = 'failed'
+                    deployment.error_messages = "\n".join(
+                        f"{p.metadata.name}: {p.status.phase}" for p in pods.items
+                    )
                 break
             time.sleep(1)
         else:
             deployment.status = 'failed'
-        deployment.logs = result.stdout
+            deployment.error_messages = "No pods were created after deployment attempt."
+
     except subprocess.CalledProcessError as e:
         deployment.status = 'failed'
-        deployment.logs = e.stderr
+        deployment.logs = e.stdout
+        deployment.error_messages = e.stderr or "Helm command failed"
 
     deployment.save()
     return deployment

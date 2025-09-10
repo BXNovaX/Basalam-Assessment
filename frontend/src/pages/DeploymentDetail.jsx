@@ -64,6 +64,20 @@ export default function DeploymentDetail() {
           </CardContent>
         </Card>
 
+        {/* Error Messages */}
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="text-sm font-medium mb-6">Error Messages</h2>
+            {deployment?.error_messages ? (
+              <pre className="text-sm bg-muted p-4 rounded-md overflow-x-auto whitespace-pre-wrap text-red-600">
+                {deployment.error_messages}
+              </pre>
+            ) : (
+              <div className="text-sm text-muted-foreground">No error messages.</div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Timestamps */}
         <Card>
           <CardContent className="p-6 grid md:grid-cols-2 gap-6">
