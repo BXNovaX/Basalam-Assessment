@@ -18,20 +18,46 @@ def get_k8s_client():
 
 def is_app_running(app):
     v1 = get_k8s_client()
-    label_selector = f"app={app.name}"
+    label_selector = f"app.kubernetes.io/instance={app.name}"
     pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=label_selector)
     return any(pod.status.phase == "Running" for pod in pods.items)
 
 def deploy_app(app):
     values = {
-        "replicaCount": app.replicas,
-        "image": {
-            "repository": app.image.split(":")[0],
-            "tag": app.image.split(":")[1] if ":" in app.image else "latest"
+        "releasePrefix": "-",
+        "defaultImage": app.image.split(":")[0],
+        "defaultImageTag": app.image.split(":")[1] if ":" in app.image else "latest",
+        "deployments": {
+            "api": {
+                "replicas": app.replicas,
+                "containers": [
+                    {
+                        "name": "app",
+                        "ports": [
+                            {
+                                "containerPort": app.port,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "env": [{"name": k, "value": str(v)} for k, v in app.environment_variables.items()]
+                    }
+                ]
+            }
         },
-        "service": {"port": app.port},
-        "env": app.environment_variables or {},
+        "services": {
+            "nginx": {
+                "type": "ClusterIP",
+                "ports": [{
+                    "name": "http",
+                    "port": app.port,
+                    "targetPort": app.port,
+                    "protocol": "TCP"
+                }]
+            }
+        }
     }
+
 
     values_yaml = yaml.safe_dump(values, sort_keys=False)
 
@@ -58,7 +84,7 @@ def deploy_app(app):
 
             v1 = get_k8s_client()
             for _ in range(10):
-                pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app={app.name}")
+                pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app.kubernetes.io/instance={app.name}")
                 if pods.items:
                     if any(p.status.phase == "Running" for p in pods.items):
                         deployment_obj.status = 'success'
