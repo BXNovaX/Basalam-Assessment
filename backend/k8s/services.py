@@ -20,7 +20,12 @@ def is_app_running(app):
     v1 = get_k8s_client()
     label_selector = f"app.kubernetes.io/instance={app.name}"
     pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=label_selector)
-    return any(pod.status.phase == "Running" for pod in pods.items)
+    
+    for pod in pods.items:
+        container_statuses = pod.status.container_statuses or []
+        if pod.status.phase == "Running" and all(cs.ready for cs in container_statuses):
+            return True
+    return False
 
 def deploy_app(app):
     values = {
@@ -83,22 +88,29 @@ def deploy_app(app):
             deployment_obj.logs = result.stdout
 
             v1 = get_k8s_client()
-            for _ in range(10):
+            for _ in range(30):
                 pods = v1.list_namespaced_pod(namespace=app.namespace, label_selector=f"app.kubernetes.io/instance={app.name}")
                 if pods.items:
-                    if any(p.status.phase == "Running" for p in pods.items):
+                    all_ready = True
+                    for pod in pods.items:
+                        container_statuses = pod.status.container_statuses or []
+                        if pod.status.phase != "Running" or not all(cs.ready for cs in container_statuses):
+                            all_ready = False
+                            break
+
+                    if all_ready:
                         deployment_obj.status = 'success'
                         deployment_obj.error_messages = ""
+                        break
                     else:
-                        deployment_obj.status = 'failed'
-                        deployment_obj.error_messages = "\n".join(
-                            f"{p.metadata.name}: {p.status.phase}" for p in pods.items
-                        )
-                    break
-                time.sleep(1)
+                        deployment_obj.status = 'in-progress'
+                else:
+                    deployment_obj.status = 'in-progress'
+
+                time.sleep(2)
             else:
                 deployment_obj.status = 'failed'
-                deployment_obj.error_messages = "No pods were created after deployment attempt."
+                deployment_obj.error_messages = "Pods did not become ready after deployment attempt."
 
         except subprocess.CalledProcessError as e:
             deployment_obj.status = 'failed'
