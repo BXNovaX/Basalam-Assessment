@@ -28,7 +28,7 @@ export default function DeploymentDetail() {
               </svg>
             </Link>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Deployment of {deployment?.app?.name}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">Deployment of {deployment?.app_name}</h1>
               <p className="text-sm text-muted-foreground mt-1">Status: {deployment?.status}</p>
             </div>
           </div>
